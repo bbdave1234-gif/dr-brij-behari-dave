@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Write a Post | Dr. Brij Behari Dave</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav>
+    <a href="index.html" class="brand">Dr. Brij Behari Dave</a>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="publications.html">Publications</a>
+      <a href="blog.html">Blog</a>
+      <a href="upload.html">Upload a Paper</a>
+      <a href="write-post.html">Write a Post</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <div class="container">
+    <h1>Write a Blog Post</h1>
+
+    <div class="counter-banner">
+      <span class="count" id="blog-count">&hellip;</span>
+      <span class="label" id="blog-count-label">posts published</span>
+    </div>
+
+    <p>Only the title and the post text are required. Click <strong>Publish post</strong> and it's saved straight to your Google Sheet and appears in the list below — instantly.</p>
+
+    <form class="form-card" id="post-form" style="max-width: 640px;">
+      <div class="form-row">
+        <label for="title">Post title <span class="required">*</span></label>
+        <input id="title" type="text" required placeholder="e.g. Reflections on Public Administration">
+      </div>
+
+      <div class="form-row">
+        <label for="date">Date (optional — defaults to today)</label>
+        <input id="date" type="date">
+      </div>
+
+      <div class="form-row">
+        <label for="content">Post content <span class="required">*</span></label>
+        <textarea id="content" required placeholder="Write your post here…"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="link">Link (optional — if this post lives elsewhere, e.g. bb4dave.wordpress.com)</label>
+        <input id="link" type="text" placeholder="e.g. https://bb4dave.wordpress.com/2026/09/25/my-post">
+      </div>
+
+      <button class="btn" type="submit" id="submit-btn">Publish post</button>
+
+      <div id="status"></div>
+    </form>
+
+    <div class="results-section">
+      <h2 class="section-title">Posts on this site</h2>
+      <p class="loading-state" id="loading">Loading posts&hellip;</p>
+      <p class="error-state" id="error" style="display:none;"></p>
+      <p class="empty-state" id="empty" style="display:none;">No posts yet — be the first!</p>
+      <div id="list"></div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">&copy; <span id="year-footer"></span> Dr. Brij Behari Dave</footer>
+
+<script src="config.js"></script>
+<script>
+  document.getElementById("year-footer").textContent = new Date().getFullYear();
+
+  function renderPosts(posts) {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+    document.getElementById("empty").style.display = posts.length ? "none" : "block";
+    document.getElementById("blog-count").textContent = posts.length;
+    document.getElementById("blog-count-label").textContent =
+      (posts.length === 1 ? "post" : "posts") + " published";
+
+    posts.forEach((p) => {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML =
+        '<h3 class="title">' + p.title + "</h3>" +
+        '<div class="meta">' + (p.date || "") + "</div>" +
+        '<div class="content">' + (p.content || "") + "</div>" +
+        (p.link ? '<div class="card-footer" style="margin-top:12px;"><a class="btn secondary" href="' + p.link + '" target="_blank" rel="noreferrer">Read more</a></div>' : "");
+      list.appendChild(div);
+    });
+  }
+
+  function loadPosts() {
+    fetchRows("blogs")
+      .then((rows) => {
+        document.getElementById("loading").style.display = "none";
+        renderPosts(rows.filter((r) => r.title));
+      })
+      .catch((err) => {
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("error").style.display = "block";
+        document.getElementById("error").textContent = err.message;
+      });
+  }
+  loadPosts();
+
+  document.getElementById("post-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+    status.innerHTML = "";
+
+    const title = document.getElementById("title").value.trim();
+    const date = document.getElementById("date").value;
+    const content = document.getElementById("content").value.trim();
+    const link = document.getElementById("link").value.trim();
+
+    if (!title) { status.innerHTML = '<p class="status-message error">Please enter a title.</p>'; return; }
+    if (!content) { status.innerHTML = '<p class="status-message error">Please write some content.</p>'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Publishing…";
+
+    try {
+      const rows = await postToScript({ action: "addBlog", title, date, content, link });
+      status.innerHTML = '<p class="status-message success"><strong>Published!</strong> Your post is live below.</p>';
+      document.getElementById("post-form").reset();
+      renderPosts(rows.filter((r) => r.title));
+    } catch (err) {
+      status.innerHTML = '<p class="status-message error">' + err.message + "</p>";
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Publish post";
+    }
+  });
+</script>
+
+</body>
+</html>

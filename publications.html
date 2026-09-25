@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publications | Dr. Brij Behari Dave</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav>
+    <a href="index.html" class="brand">Dr. Brij Behari Dave</a>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="publications.html">Publications</a>
+      <a href="blog.html">Blog</a>
+      <a href="upload.html">Upload a Paper</a>
+      <a href="write-post.html">Write a Post</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <div class="container">
+    <h1>Publications</h1>
+
+    <div class="counter-banner">
+      <span class="count" id="paper-count">&hellip;</span>
+      <span class="label" id="paper-count-label">papers published on this site</span>
+    </div>
+
+    <div class="filter-row" id="filter-row" style="display:none;">
+      <label for="year-filter">Filter by year:</label>
+      <select id="year-filter"></select>
+    </div>
+
+    <p class="loading-state" id="loading">Loading publications&hellip;</p>
+    <p class="error-state" id="error" style="display:none;"></p>
+    <p class="empty-state" id="empty" style="display:none;">No papers uploaded yet. <a href="upload.html">Upload the first one</a>.</p>
+
+    <div id="list"></div>
+
+    <p style="margin-top: 32px;"><a class="btn" href="upload.html">Upload a New Paper</a></p>
+  </div>
+</main>
+
+<footer class="site-footer">&copy; <span id="year"></span> Dr. Brij Behari Dave</footer>
+
+<script src="config.js"></script>
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+  let allPapers = [];
+
+  function render(papers) {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+    document.getElementById("empty").style.display = papers.length ? "none" : "block";
+
+    papers.forEach((p) => {
+      const div = document.createElement("div");
+      div.className = "card";
+      const metaParts = [];
+      if (p.year) metaParts.push(p.year);
+      if (p.journal) metaParts.push(p.journal);
+      let doiHtml = "";
+      if (p.doi) {
+        const doiUrl = "https://doi.org/" + p.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+        doiHtml = ' &middot; <a href="' + doiUrl + '" target="_blank" rel="noreferrer">DOI: ' + p.doi + "</a>";
+      }
+      div.innerHTML =
+        '<h3 class="title">' + (p.title || "Untitled") + "</h3>" +
+        '<div class="meta">' + metaParts.join(" &middot; ") + doiHtml + "</div>" +
+        '<div class="card-footer">' +
+        (p["file link"] ? '<a class="btn" href="' + p["file link"] + '" target="_blank" rel="noreferrer">View / Download</a>' : "<span></span>") +
+        "</div>";
+      list.appendChild(div);
+    });
+  }
+
+  function populateYearFilter(papers) {
+    const years = [...new Set(papers.map((p) => p.year).filter(Boolean))].sort((a, b) => b - a);
+    if (years.length === 0) return;
+    document.getElementById("filter-row").style.display = "flex";
+    const select = document.getElementById("year-filter");
+    select.innerHTML = '<option value="all">All years</option>' +
+      years.map((y) => '<option value="' + y + '">' + y + "</option>").join("");
+    select.addEventListener("change", () => {
+      const v = select.value;
+      render(v === "all" ? allPapers : allPapers.filter((p) => p.year === v));
+    });
+  }
+
+  fetchRows("papers")
+    .then((rows) => {
+      allPapers = rows.filter((r) => r.title);
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("paper-count").textContent = allPapers.length;
+      document.getElementById("paper-count-label").textContent =
+        (allPapers.length === 1 ? "paper" : "papers") + " published on this site";
+      populateYearFilter(allPapers);
+      render(allPapers);
+    })
+    .catch((err) => {
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("error").style.display = "block";
+      document.getElementById("error").textContent = err.message;
+    });
+</script>
+
+</body>
+</html>

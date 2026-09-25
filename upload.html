@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload a Paper | Dr. Brij Behari Dave</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav>
+    <a href="index.html" class="brand">Dr. Brij Behari Dave</a>
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="publications.html">Publications</a>
+      <a href="blog.html">Blog</a>
+      <a href="upload.html">Upload a Paper</a>
+      <a href="write-post.html">Write a Post</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <div class="container">
+    <h1>Upload a Paper</h1>
+
+    <div class="counter-banner">
+      <span class="count" id="paper-count">&hellip;</span>
+      <span class="label" id="paper-count-label">papers published on this site</span>
+    </div>
+
+    <p>Choose a PDF or Word file (up to 25MB). Only the title and file are required. As soon as you click <strong>Publish paper</strong>, it's saved to Google Drive, added to your Google Sheet, and appears in the list below — instantly, no extra steps.</p>
+
+    <form class="form-card" id="upload-form">
+      <div class="form-row">
+        <label for="title">Paper title <span class="required">*</span></label>
+        <input id="title" type="text" required placeholder="e.g. Fiscal Federalism in Rural Governance">
+      </div>
+
+      <div class="form-row">
+        <label for="year">Year of publication</label>
+        <input id="year" type="text" placeholder="e.g. 2024">
+      </div>
+
+      <div class="form-row">
+        <label for="journal">Journal name (optional)</label>
+        <input id="journal" type="text" placeholder="e.g. Indian Journal of Public Administration">
+      </div>
+
+      <div class="form-row">
+        <label for="doi">DOI (optional)</label>
+        <input id="doi" type="text" placeholder="e.g. 10.1234/abcd.5678">
+      </div>
+
+      <div class="form-row">
+        <label>File (.pdf or .docx, up to 25MB) <span class="required">*</span></label>
+        <div class="dropzone" id="dropzone">
+          <div class="dz-title">Drag &amp; drop your file here</div>
+          <div class="dz-hint">or click to choose a file from this computer</div>
+          <div class="dz-file" id="dz-filename"></div>
+          <input id="file" type="file" accept=".pdf,.docx" required>
+        </div>
+      </div>
+
+      <button class="btn" type="submit" id="submit-btn">Publish paper</button>
+
+      <div id="status"></div>
+    </form>
+
+    <div class="results-section">
+      <h2 class="section-title">Papers on this site</h2>
+      <p class="loading-state" id="loading">Loading publications&hellip;</p>
+      <p class="error-state" id="error" style="display:none;"></p>
+      <p class="empty-state" id="empty" style="display:none;">No papers uploaded yet — be the first!</p>
+      <div id="list"></div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">&copy; <span id="year-footer"></span> Dr. Brij Behari Dave</footer>
+
+<script src="config.js"></script>
+<script>
+  document.getElementById("year-footer").textContent = new Date().getFullYear();
+  const MAX_SIZE = 25 * 1024 * 1024;
+
+  // ---- Drag & drop / click-to-browse wiring ----
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("file");
+  const dzFilename = document.getElementById("dz-filename");
+
+  dropzone.addEventListener("click", () => fileInput.click());
+  ["dragenter", "dragover"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); })
+  );
+  dropzone.addEventListener("drop", (e) => {
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      updateFilenameLabel();
+    }
+  });
+  fileInput.addEventListener("change", updateFilenameLabel);
+  function updateFilenameLabel() {
+    dzFilename.textContent = fileInput.files[0] ? fileInput.files[0].name : "";
+  }
+
+  // ---- Render the paper list (shared shape with publications.html) ----
+  function renderPapers(papers) {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+    document.getElementById("empty").style.display = papers.length ? "none" : "block";
+    document.getElementById("paper-count").textContent = papers.length;
+    document.getElementById("paper-count-label").textContent =
+      (papers.length === 1 ? "paper" : "papers") + " published on this site";
+
+    papers.forEach((p) => {
+      const div = document.createElement("div");
+      div.className = "card";
+      const metaParts = [];
+      if (p.year) metaParts.push(p.year);
+      if (p.journal) metaParts.push(p.journal);
+      let doiHtml = "";
+      if (p.doi) {
+        const doiUrl = "https://doi.org/" + p.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+        doiHtml = ' &middot; <a href="' + doiUrl + '" target="_blank" rel="noreferrer">DOI: ' + p.doi + "</a>";
+      }
+      div.innerHTML =
+        '<h3 class="title">' + (p.title || "Untitled") + "</h3>" +
+        '<div class="meta">' + metaParts.join(" &middot; ") + doiHtml + "</div>" +
+        '<div class="card-footer">' +
+        (p["file link"] ? '<a class="btn" href="' + p["file link"] + '" target="_blank" rel="noreferrer">View / Download</a>' : "<span></span>") +
+        "</div>";
+      list.appendChild(div);
+    });
+  }
+
+  function loadPapers() {
+    fetchRows("papers")
+      .then((rows) => {
+        document.getElementById("loading").style.display = "none";
+        renderPapers(rows.filter((r) => r.title));
+      })
+      .catch((err) => {
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("error").style.display = "block";
+        document.getElementById("error").textContent = err.message;
+      });
+  }
+  loadPapers();
+
+  // ---- Publish button ----
+  document.getElementById("upload-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+    status.innerHTML = "";
+
+    const title = document.getElementById("title").value.trim();
+    const year = document.getElementById("year").value.trim();
+    const journal = document.getElementById("journal").value.trim();
+    const doi = document.getElementById("doi").value.trim();
+    const file = fileInput.files[0];
+
+    if (!title) { status.innerHTML = '<p class="status-message error">Please enter a title.</p>'; return; }
+    if (!file) { status.innerHTML = '<p class="status-message error">Please choose a file.</p>'; return; }
+    if (file.size > MAX_SIZE) { status.innerHTML = '<p class="status-message error">File is larger than the 25MB limit.</p>'; return; }
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    const isDocx = file.name.toLowerCase().endsWith(".docx");
+    if (!isPdf && !isDocx) { status.innerHTML = '<p class="status-message error">Only .pdf or .docx files are accepted.</p>'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Publishing…";
+
+    try {
+      const fileBase64 = await fileToBase64(file);
+      const rows = await postToScript({
+        action: "addPaper",
+        title, year, journal, doi,
+        fileName: file.name,
+        fileType: file.type,
+        fileBase64,
+      });
+
+      status.innerHTML = '<p class="status-message success"><strong>Published!</strong> Your paper is live below.</p>';
+      document.getElementById("upload-form").reset();
+      dzFilename.textContent = "";
+      renderPapers(rows.filter((r) => r.title));
+    } catch (err) {
+      status.innerHTML = '<p class="status-message error">' + err.message + "</p>";
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Publish paper";
+    }
+  });
+</script>
+
+</body>
+</html>
